@@ -50,6 +50,13 @@ public:
         static void init() {
                 // Should be initialized by the user manually for now
         }
+#elif USING_SPI4LINKIT
+        static void init() {
+                SPI.begin(); // The SPI library with transaction will take care of setting up the pins - settings is set in beginTransaction()
+                SPI.setClockDivider(SPI_CLOCK_DIV32);
+                SPI_SS::SetDirWrite();
+                SPI_SS::Set();
+        }
 #elif !defined(SPDR)
         static void init() {
                 SPI_SS::SetDirWrite();
@@ -172,6 +179,11 @@ void MAX3421e< SPI_SS, INTR >::regWr(uint8_t reg, uint8_t data) {
         c[0] = reg | 0x02;
         c[1] = data;
         HAL_SPI_Transmit(&SPI_Handle, c, 2, HAL_MAX_DELAY);
+#elif USING_SPI4LINKIT
+        uint8_t c[2];
+        c[0] = reg | 0x02;
+        c[1] = data;
+        SPI.write(c, 2);
 #elif !defined(SPDR)
         SPI.transfer(reg | 0x02);
         SPI.transfer(data);
@@ -216,6 +228,10 @@ uint8_t* MAX3421e< SPI_SS, INTR >::bytesWr(uint8_t reg, uint8_t nbytes, uint8_t*
         uint8_t data = reg | 0x02;
         HAL_SPI_Transmit(&SPI_Handle, &data, 1, HAL_MAX_DELAY);
         HAL_SPI_Transmit(&SPI_Handle, data_p, nbytes, HAL_MAX_DELAY);
+        data_p += nbytes;
+#elif USING_SPI4LINKIT
+        SPI.transfer(reg | 0x02);
+        SPI.write(data_p, nbytes);
         data_p += nbytes;
 #elif !defined(SPDR)
         SPI.transfer(reg | 0x02);
@@ -272,6 +288,10 @@ uint8_t MAX3421e< SPI_SS, INTR >::regRd(uint8_t reg) {
         uint8_t rv = 0;
         HAL_SPI_Receive(&SPI_Handle, &rv, 1, HAL_MAX_DELAY);
         SPI_SS::Set();
+#elif USING_SPI4LINKIT
+        SPI.transfer(reg);
+        uint8_t rv = SPI.transfer(0); // Send empty byte
+        SPI_SS::Set();
 #elif !defined(SPDR) || SPI_HAS_TRANSACTION
         SPI.transfer(reg);
         uint8_t rv = SPI.transfer(0); // Send empty byte
@@ -319,6 +339,12 @@ uint8_t* MAX3421e< SPI_SS, INTR >::bytesRd(uint8_t reg, uint8_t nbytes, uint8_t*
         HAL_SPI_Transmit(&SPI_Handle, &reg, 1, HAL_MAX_DELAY);
         memset(data_p, 0, nbytes); // Make sure we send out empty bytes
         HAL_SPI_Receive(&SPI_Handle, data_p, nbytes, HAL_MAX_DELAY);
+        data_p += nbytes;
+#elif USING_SPI4LINKIT
+        SPI.transfer(reg);
+        memset(data_p, 0, nbytes); // Make sure we send out empty bytes
+        // TODO: fix, as this is only writing
+        SPI.write(data_p, nbytes);
         data_p += nbytes;
 #elif !defined(SPDR)
         SPI.transfer(reg);
